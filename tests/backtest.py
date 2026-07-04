@@ -216,6 +216,13 @@ class ScalpStrategy(Strategy):
         # (không dùng trade_contract_size — nhiều broker báo 1.0 kể cả với gold).
         # Nếu units < 1 (vd BTC lot nhỏ) thì để backtesting.py tự sizing, chỉ tin bảng USD.
         lot = self._calc_lot(sl_distance)
+
+        # Chặn lệnh nếu lỗ dự kiến tại SL vượt ngưỡng USD (khớp logic live)
+        if config.MAX_LOSS_PER_TRADE > 0:
+            est_loss = sl_distance / self.tick_size * self.tick_value * lot
+            if est_loss > config.MAX_LOSS_PER_TRADE:
+                return
+
         units = int(round(lot * self.tick_value / self.tick_size))
         size_arg = {"size": units} if units >= 1 else {}
 

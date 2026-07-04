@@ -45,6 +45,21 @@ def calculate_lot_size(
     return round(lot, 2)
 
 
+def loss_at_sl(symbol: str, sl_distance: float, lot: float) -> float:
+    """
+    Lỗ dự kiến (USD) nếu lệnh dính SL: sl_distance / tick_size × tick_value × lot.
+    Trả 0.0 nếu thiếu thông tin symbol (không chặn nhầm).
+    """
+    info = mt5.symbol_info(symbol)
+    if info is None or lot <= 0 or sl_distance <= 0:
+        return 0.0
+    tick_size  = info.trade_tick_size or info.point
+    tick_value = info.trade_tick_value
+    if not tick_size or not tick_value:
+        return 0.0
+    return sl_distance / tick_size * tick_value * lot
+
+
 def calculate_tp(
     entry: float,
     sl: float,

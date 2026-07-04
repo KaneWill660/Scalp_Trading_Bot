@@ -21,7 +21,7 @@ from loguru import logger
 
 import config
 from connectors.mt5_connector import get_ohlcv
-from risk.risk_manager import calculate_lot_size, calculate_tp
+from risk.risk_manager import calculate_lot_size, calculate_tp, loss_at_sl
 from strategy.candles import bearish_confirmation, bullish_confirmation
 from strategy.indicators import atr, ema, rsi
 from strategy.price_action import check_signal as price_action_signal
@@ -160,6 +160,16 @@ def check_for_signal(
 
     tp  = calculate_tp(entry, sl, rr=config.RR, direction=direction, digits=digits)
     lot = fixed_lot if fixed_lot else calculate_lot_size(symbol, balance, entry, sl, risk_percent)
+
+    # Chặn lệnh nếu lỗ dự kiến tại SL vượt ngưỡng USD (quan trọng khi dùng lot cố định)
+    if config.MAX_LOSS_PER_TRADE > 0:
+        est_loss = loss_at_sl(symbol, sl_distance, lot)
+        if est_loss > config.MAX_LOSS_PER_TRADE:
+            logger.info(
+                f"{symbol} — bỏ tín hiệu {direction} ({candle_type}): lỗ dự kiến "
+                f"${est_loss:.2f} > MAX_LOSS_PER_TRADE ${config.MAX_LOSS_PER_TRADE:.2f}"
+            )
+            return None
 
     _last_signal_bar[symbol] = bar_time
     logger.info(

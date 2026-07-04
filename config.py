@@ -112,6 +112,8 @@ SERVER_UTC_OFFSET_HOURS = int(os.getenv("SERVER_UTC_OFFSET_HOURS", "0"))
 RISK_PERCENT        = float(os.getenv("RISK_PERCENT", "0.01"))
 MAX_DAILY_LOSS_PCT  = float(os.getenv("MAX_DAILY_LOSS_PCT", "0.03"))
 LEVERAGE            = int(os.getenv("LEVERAGE", "100"))
+# Lỗ tối đa cho 1 lệnh (USD). 0 = tắt. Nếu lỗ dự kiến tại SL > ngưỡng này → bỏ lệnh.
+MAX_LOSS_PER_TRADE  = float(os.getenv("MAX_LOSS_PER_TRADE", "0"))
 
 # ── Live loop ─────────────────────────────────────────────────────────────────
 CHECK_INTERVAL_SEC  = int(os.getenv("CHECK_INTERVAL_SEC", "60"))
