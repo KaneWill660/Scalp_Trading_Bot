@@ -87,7 +87,7 @@ def check_for_signal(
     Phân tích symbol trên nến entry vừa đóng, trả về signal dict nếu đủ điều kiện.
     fixed_lot: nếu set thì dùng lot này thay vì tính từ risk_percent.
     """
-    if not is_trading_session():
+    if not is_trading_session(symbol=symbol):
         return None
 
     sym_info = mt5.symbol_info(symbol)

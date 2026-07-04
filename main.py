@@ -15,8 +15,7 @@ from connectors.mt5_connector import (
     connect,
     disconnect,
     get_account_balance,
-    get_all_positions,
-    get_open_positions,
+    get_bot_positions,
     move_sl_to_entry,
     place_market_order,
 )
@@ -69,8 +68,8 @@ async def trading_loop(bot_state: dict, symbols: list):
             bot_state["pause_until"] = None
             await send_message("▶️ Hết thời gian tạm dừng — Bot tiếp tục quét tín hiệu.")
 
-        # Auto breakeven khi R:R đạt 1:1
-        for p in get_all_positions():
+        # Auto breakeven khi R:R đạt 1:1 (chỉ lệnh của bot, không đụng lệnh tay)
+        for p in get_bot_positions():
             if p.ticket in be_done:
                 continue
             if p.sl == 0 or p.sl == p.price_open:
@@ -87,7 +86,7 @@ async def trading_loop(bot_state: dict, symbols: list):
                     )
 
         # Kiểm tra lệnh đã đóng → record PnL
-        current_open = {p.ticket for p in get_all_positions()}
+        current_open = {p.ticket for p in get_bot_positions()}
         for ticket, info in list(open_tickets.items()):
             if ticket not in current_open:
                 bal_after = get_account_balance()
@@ -114,28 +113,38 @@ async def trading_loop(bot_state: dict, symbols: list):
             await asyncio.sleep(config.CHECK_INTERVAL_SEC)
             continue
 
-        # Only analyze during London/NY session
-        if not is_trading_session():
-            logger.debug("Outside session — sleeping")
+        # Chỉ ngủ nếu KHÔNG symbol nào được phép trade lúc này
+        # (crypto 24/7 vẫn quét vào cuối tuần; check_for_signal lọc phiên riêng từng symbol)
+        if not any(is_trading_session(symbol=s) for s in symbols):
+            logger.debug("Outside session (mọi symbol) — sleeping")
             await asyncio.sleep(config.CHECK_INTERVAL_SEC)
             continue
 
         # Scan each symbol
         balance = get_account_balance()
         risk_percent = bot_state.get("risk_percent", config.RISK_PERCENT)
+        scan_status = []  # heartbeat: trạng thái từng symbol mỗi vòng quét
 
         for symbol in symbols:
-            # 1 vị thế mở per symbol
-            if get_open_positions(symbol):
+            # 1 vị thế mở per symbol (chỉ tính lệnh của bot)
+            if get_bot_positions(symbol):
+                scan_status.append(f"{symbol}: đang có lệnh")
+                continue
+
+            if not is_trading_session(symbol=symbol):
+                scan_status.append(f"{symbol}: ngoài phiên")
                 continue
 
             # Cooldown per symbol
             last_sig = _last_signal_time.get(symbol)
             if last_sig and (now - last_sig).total_seconds() < config.SIGNAL_COOLDOWN_MIN * 60:
+                mins = int((config.SIGNAL_COOLDOWN_MIN * 60 - (now - last_sig).total_seconds()) / 60)
+                scan_status.append(f"{symbol}: cooldown {mins}m")
                 continue
 
             fixed_lot = config.get_symbol_lot(symbol) or None
             signal = check_for_signal(symbol, balance, risk_percent, fixed_lot)
+            scan_status.append(f"{symbol}: {'🎯 TÍN HIỆU' if signal else 'chờ tín hiệu'}")
 
             if signal:
                 logger.info(f"Signal found: {symbol} {signal['direction']} @ {signal['entry']}")
@@ -170,6 +179,9 @@ async def trading_loop(bot_state: dict, symbols: list):
                         )
                     else:
                         await send_message(f"❌ <b>Order failed</b> — {symbol}. Check logs.")
+
+        # Heartbeat: 1 dòng mỗi vòng quét để biết bot đang sống & đang check gì
+        logger.info(f"💓 Quét {now.strftime('%H:%M:%S')} UTC | " + " | ".join(scan_status))
 
         await asyncio.sleep(config.CHECK_INTERVAL_SEC)
 

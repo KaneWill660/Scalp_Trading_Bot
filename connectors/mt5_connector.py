@@ -102,9 +102,15 @@ def get_open_positions(symbol: str = None) -> list:
 
 
 def get_all_positions() -> list:
-    """Return all open positions across all symbols."""
+    """Return all open positions across all symbols (kể cả lệnh tay của user)."""
     positions = mt5.positions_get()
     return list(positions) if positions else []
+
+
+def get_bot_positions(symbol: str = None) -> list:
+    """Chỉ lệnh do bot đặt (magic == MAGIC) — bỏ qua lệnh tay của user."""
+    positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
+    return [p for p in (positions or []) if p.magic == MAGIC]
 
 
 def get_pending_orders() -> list:

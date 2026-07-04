@@ -112,6 +112,7 @@ def build_indicator_frame(df_entry: pd.DataFrame, df_h1: pd.DataFrame) -> pd.Dat
 class ScalpStrategy(Strategy):
     ind: pd.DataFrame = None       # indicator frame, aligned theo vị trí với data
     raw: pd.DataFrame = None       # OHLCV gốc (lowercase) cho chiến lược price_action
+    symbol: str = ""               # symbol đang backtest (cho session filter 24/7)
     trade_log: list = []
     fixed_lot: float = 0.0
     tick_size: float = 0.01
@@ -147,7 +148,7 @@ class ScalpStrategy(Strategy):
         # Session filter (bar time server → UTC)
         bar_time = self.data.index[i].to_pydatetime()
         utc_time = bar_time - timedelta(hours=config.SERVER_UTC_OFFSET_HOURS)
-        if not is_trading_session(utc_time):
+        if not is_trading_session(utc_time, ScalpStrategy.symbol):
             return
 
         trend = int(row["trend"])
@@ -402,6 +403,7 @@ def run_backtest_for_symbol(symbol: str, months: int, cash: float) -> list:
 
     ScalpStrategy.ind          = ind
     ScalpStrategy.raw          = df_entry.reset_index(drop=True)
+    ScalpStrategy.symbol       = symbol
     ScalpStrategy.fixed_lot    = config.get_symbol_lot(symbol)
     ScalpStrategy.tick_size    = sym_info.trade_tick_size or sym_info.point
     ScalpStrategy.tick_value   = sym_info.trade_tick_value or 1.0

@@ -103,6 +103,12 @@ RSI_SELL_MIN = float(os.getenv("RSI_SELL_MIN", "55"))
 # SESSION_FILTER=0 → trade 24/7, bỏ qua giờ phiên lẫn cuối tuần
 # (thị trường đóng cửa thì MT5 tự chặn lệnh, BTC vẫn trade được cuối tuần)
 SESSION_FILTER    = int(os.getenv("SESSION_FILTER", "1"))
+# Symbol trade 24/7 (crypto) — luôn bỏ qua lọc phiên + cuối tuần, kể cả khi SESSION_FILTER=1
+SESSION_24_7_SYMBOLS = [
+    s.strip()
+    for s in os.getenv("SESSION_24_7_SYMBOLS", "BTCUSDc").split(",")
+    if s.strip()
+]
 SESSION_START_MIN = _parse_hhmm(os.getenv("SESSION_START", "07:00"), 7 * 60)
 SESSION_END_MIN   = _parse_hhmm(os.getenv("SESSION_END", "15:30"), 15 * 60 + 30)
 # Chênh lệch giờ server MT5 so với UTC (dùng cho backtest — data trả về theo giờ server)

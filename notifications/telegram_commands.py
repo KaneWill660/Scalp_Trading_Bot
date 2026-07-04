@@ -24,8 +24,10 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from connectors.mt5_connector import (
+    MAGIC,
     get_account_balance,
     get_all_positions,
+    get_bot_positions,
     get_pending_orders,
     get_deal_history,
     move_sl_to_entry,
@@ -87,12 +89,13 @@ async def cmd_status(chat_id: int):
         await _reply(chat_id, "📭 Không có lệnh nào đang chạy.")
         return
 
-    lines = ["📊 <b>Lệnh đang chạy:</b>\n"]
+    lines = ["📊 <b>Lệnh đang chạy:</b>  (🤖 bot | 👤 tay)\n"]
     for p in positions:
         direction = "BUY 🟢" if p.type == 0 else "SELL 🔴"
         pnl_sign  = "+" if p.profit >= 0 else ""
+        owner     = "🤖" if p.magic == MAGIC else "👤"
         lines.append(
-            f"• <b>{p.symbol}</b> {direction}\n"
+            f"{owner} <b>{p.symbol}</b> {direction}\n"
             f"  Lot: {p.volume} | Entry: {p.price_open:.2f}\n"
             f"  SL: {p.sl:.2f} | TP: {p.tp:.2f}\n"
             f"  P&L: <b>{pnl_sign}{p.profit:.2f} USD</b>\n"
@@ -157,9 +160,9 @@ async def cmd_report(chat_id: int, text: str):
 
 
 async def cmd_breakeven(chat_id: int):
-    positions = get_all_positions()
+    positions = get_bot_positions()  # chỉ lệnh của bot
     if not positions:
-        await _reply(chat_id, "📭 Không có lệnh nào đang mở.")
+        await _reply(chat_id, "📭 Bot không có lệnh nào đang mở.")
         return
 
     count = 0
@@ -169,15 +172,15 @@ async def cmd_breakeven(chat_id: int):
                 count += 1
 
     if count:
-        await _reply(chat_id, f"✅ Đã BE <b>{count}</b> lệnh có lãi (tất cả lệnh, kể cả lệnh thủ công).")
+        await _reply(chat_id, f"✅ Đã BE <b>{count}</b> lệnh có lãi của bot.")
     else:
-        await _reply(chat_id, "⚠️ Không có lệnh nào đang có lãi để chuyển breakeven.")
+        await _reply(chat_id, "⚠️ Không có lệnh nào của bot đang có lãi để chuyển breakeven.")
 
 
 async def cmd_closeall(chat_id: int):
-    positions = get_all_positions()
+    positions = get_bot_positions()  # chỉ đóng lệnh của bot, không đụng lệnh tay
     if not positions:
-        await _reply(chat_id, "📭 Không có lệnh nào để đóng.")
+        await _reply(chat_id, "📭 Bot không có lệnh nào để đóng.")
         return
 
     count = 0
@@ -185,20 +188,20 @@ async def cmd_closeall(chat_id: int):
         if close_position(p.ticket):
             count += 1
 
-    await _reply(chat_id, f"🛑 Đã đóng <b>{count}/{len(positions)}</b> lệnh.")
+    await _reply(chat_id, f"🛑 Đã đóng <b>{count}/{len(positions)}</b> lệnh của bot.")
 
 
 async def cmd_help(chat_id: int):
     msg = (
         "🤖 <b>Scalp Bot — Danh sách lệnh:</b>\n\n"
         "/balance — Số dư tài khoản\n"
-        "/status — Lệnh đang chạy & P&L\n"
+        "/status — Lệnh đang chạy & P&L (🤖 bot | 👤 tay)\n"
         "/pending — Lệnh đang chờ (Pending)\n"
         "/report N — Tổng kết N ngày gần nhất\n"
         "/stop — Dừng quét tín hiệu\n"
         "/start — Tiếp tục quét tín hiệu\n"
-        "/be — Chuyển SL về entry (breakeven)\n"
-        "/closeall — Đóng tất cả lệnh\n"
+        "/be — Chuyển SL về entry (chỉ lệnh bot)\n"
+        "/closeall — Đóng tất cả lệnh của bot\n"
         "/risk 0.5 — Đổi risk thành 0.5%/lệnh\n"
         "/pause 30m — Tạm dừng 30 phút (dùng h cho giờ)\n"
         "/help — Xem danh sách lệnh"

@@ -5,8 +5,13 @@ from datetime import datetime, timezone
 import config
 
 
-def is_trading_session(dt: datetime = None) -> bool:
-    """dt: thời điểm UTC cần kiểm tra (mặc định = bây giờ). Backtest truyền bar time đã quy về UTC."""
+def is_trading_session(dt: datetime = None, symbol: str = None) -> bool:
+    """
+    dt: thời điểm UTC cần kiểm tra (mặc định = bây giờ). Backtest truyền bar time đã quy về UTC.
+    symbol: nếu thuộc SESSION_24_7_SYMBOLS (crypto) → luôn True, bỏ qua phiên + cuối tuần.
+    """
+    if symbol and symbol in config.SESSION_24_7_SYMBOLS:
+        return True  # crypto trade 24/7
     if not config.SESSION_FILTER:
         return True  # trade 24/7
     dt = dt or datetime.now(timezone.utc)
