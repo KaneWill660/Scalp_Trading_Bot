@@ -99,6 +99,16 @@ RSI_PERIOD   = int(os.getenv("RSI_PERIOD", "14"))
 RSI_BUY_MAX  = float(os.getenv("RSI_BUY_MAX", "45"))
 RSI_SELL_MIN = float(os.getenv("RSI_SELL_MIN", "55"))
 
+# ── Lọc độ dốc EMA50 H1 (0 = tắt) — loại trend "phẳng"/sideway ────────────────
+# Yêu cầu EMA50 H1 dịch chuyển >= X × ATR H1 trong EMA_SLOPE_BARS nến, đúng hướng trend
+EMA_SLOPE_BARS    = int(os.getenv("EMA_SLOPE_BARS", "5"))
+MIN_EMA_SLOPE_ATR = float(os.getenv("MIN_EMA_SLOPE_ATR", "0"))
+
+# ── Lọc volume nến xác nhận (0 = tắt) ─────────────────────────────────────────
+# Volume nến xác nhận >= X × trung bình VOL_AVG_BARS nến trước đó
+MIN_VOL_CONFIRM_MULT = float(os.getenv("MIN_VOL_CONFIRM_MULT", "0"))
+VOL_AVG_BARS         = int(os.getenv("VOL_AVG_BARS", "20"))
+
 # ── Session (giờ UTC) ─────────────────────────────────────────────────────────
 # SESSION_FILTER=0 → trade 24/7, bỏ qua giờ phiên lẫn cuối tuần
 # (thị trường đóng cửa thì MT5 tự chặn lệnh, BTC vẫn trade được cuối tuần)

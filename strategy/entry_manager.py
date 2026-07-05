@@ -139,13 +139,22 @@ def check_for_signal(
         direction, sl, candle_type = res["direction"], res["sl"], res["candle_type"]
         extra["ema_zone"] = res["ema_zone"]
 
-    # ── Bước 4: Lọc RSI + SL xa + TP + lot (chung) ───────────────────────────
+    # ── Bước 4: Lọc RSI + volume + SL xa + TP + lot (chung) ──────────────────
     if config.RSI_FILTER:
         rsi_val = float(rsi(closed["close"], config.RSI_PERIOD).iloc[-1])
         if direction == "BUY" and rsi_val > config.RSI_BUY_MAX:
             return None
         if direction == "SELL" and rsi_val < config.RSI_SELL_MIN:
             return None
+
+    # Volume nến xác nhận phải vượt trung bình — phe thắng phải "ra tay" thật
+    if config.MIN_VOL_CONFIRM_MULT > 0:
+        vol_hist = closed["volume"].iloc[-(config.VOL_AVG_BARS + 1):-1]
+        if len(vol_hist) >= 5:
+            vol_avg = float(vol_hist.mean())
+            if vol_avg > 0 and float(cur["volume"]) < config.MIN_VOL_CONFIRM_MULT * vol_avg:
+                logger.debug(f"{symbol} — bỏ tín hiệu: volume nến xác nhận yếu")
+                return None
 
     entry = float(cur["close"])
     sl_distance = abs(entry - sl)

@@ -75,6 +75,8 @@ def build_indicator_frame(df_entry: pd.DataFrame, df_h1: pd.DataFrame) -> pd.Dat
     h1["atr_h1"]      = atr(h1, config.ATR_PERIOD)
     h1["adx_h1"]      = adx(h1, config.ADX_PERIOD)
     h1["close_h1"]    = h1["close"]
+    # Độ dốc EMA50 H1 chuẩn hóa theo ATR (cho MIN_EMA_SLOPE_ATR)
+    h1["slope_atr"]   = (h1["ema_h1_fast"] - h1["ema_h1_fast"].shift(config.EMA_SLOPE_BARS)) / h1["atr_h1"]
     h1["closed_at"]   = h1["time"] + pd.Timedelta(hours=1)
 
     en = df_entry.copy()
@@ -82,12 +84,14 @@ def build_indicator_frame(df_entry: pd.DataFrame, df_h1: pd.DataFrame) -> pd.Dat
     en["ema_pb_slow"] = ema(en["close"], config.EMA_PULLBACK_SLOW)
     en["atr_entry"]   = atr(en, config.ATR_PERIOD)
     en["rsi_entry"]   = rsi(en["close"], config.RSI_PERIOD)
+    # Trung bình volume của VOL_AVG_BARS nến TRƯỚC nến hiện tại (shift(1) — không tính chính nó)
+    en["vol_sma"]     = en["volume"].rolling(config.VOL_AVG_BARS).mean().shift(1)
     # Quyết định được đưa ra tại thời điểm đóng nến entry
     en["decision_time"] = en["time"] + pd.Timedelta(minutes=config.ENTRY_TF_MINUTES)
 
     merged = pd.merge_asof(
         en.sort_values("decision_time"),
-        h1[["closed_at", "ema_h1_fast", "ema_h1_slow", "atr_h1", "adx_h1", "close_h1"]].sort_values("closed_at"),
+        h1[["closed_at", "ema_h1_fast", "ema_h1_slow", "atr_h1", "adx_h1", "slope_atr", "close_h1"]].sort_values("closed_at"),
         left_on="decision_time",
         right_on="closed_at",
         direction="backward",
@@ -104,6 +108,12 @@ def build_indicator_frame(df_entry: pd.DataFrame, df_h1: pd.DataFrame) -> pd.Dat
         strong &= merged["adx_h1"] >= config.MIN_ADX_H1
     if config.MIN_EMA_GAP_ATR > 0:
         strong &= (merged["ema_h1_fast"] - merged["ema_h1_slow"]).abs() >= config.MIN_EMA_GAP_ATR * merged["atr_h1"]
+    if config.MIN_EMA_SLOPE_ATR > 0:
+        # Slope có hướng: bull cần dốc lên đủ mạnh, bear cần dốc xuống đủ mạnh
+        bull &= strong & (merged["slope_atr"] >= config.MIN_EMA_SLOPE_ATR)
+        bear &= strong & (merged["slope_atr"] <= -config.MIN_EMA_SLOPE_ATR)
+        merged["trend"] = np.where(bull, 1, np.where(bear, -1, 0))
+        return merged
 
     merged["trend"] = np.where(bull & strong, 1, np.where(bear & strong, -1, 0))
     return merged
@@ -207,6 +217,13 @@ class ScalpStrategy(Strategy):
                 return
             if direction == "SELL" and rsi_val < config.RSI_SELL_MIN:
                 return
+
+        if config.MIN_VOL_CONFIRM_MULT > 0:
+            vol_sma = self.ind["vol_sma"].iloc[i]
+            if np.isnan(vol_sma) or vol_sma <= 0:
+                return
+            if float(self.data.Volume[-1]) < config.MIN_VOL_CONFIRM_MULT * vol_sma:
+                return  # volume nến xác nhận yếu
 
         sl_distance = abs(entry - sl)
         if sl_distance <= 0 or sl_distance > config.MAX_SL_ATR_H1_MULT * row["atr_h1"]:
